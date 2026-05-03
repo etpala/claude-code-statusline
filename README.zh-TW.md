@@ -55,7 +55,7 @@
 ### 快速安裝
 
 ```bash
-git clone https://github.com/kcchien/claude-code-statusline.git
+git clone https://github.com/etpala/claude-code-statusline.git
 cd claude-code-statusline
 ./install.sh
 ```

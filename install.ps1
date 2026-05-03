@@ -2,7 +2,7 @@
 # install.ps1 — PowerShell installer for claude-code-statusline (Windows)
 #
 # Usage:
-#   git clone https://github.com/kcchien/claude-code-statusline.git
+#   git clone https://github.com/etpala/claude-code-statusline.git
 #   cd claude-code-statusline
 #   .\install.ps1
 
@@ -42,7 +42,7 @@ if (Test-Path -LiteralPath $SourceScript) {
 }
 else {
     Write-Output "Downloading statusline.ps1..."
-    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/kcchien/claude-code-statusline/main/statusline.ps1' -OutFile $TargetScript
+    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/etpala/claude-code-statusline/main/statusline.ps1' -OutFile $TargetScript
 }
 Write-Output "✓ Installed to $TargetScript"
 
@@ -51,7 +51,7 @@ if (Test-Path -LiteralPath $SourceJq) {
 }
 else {
     Write-Output "Downloading statusline.jq..."
-    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/kcchien/claude-code-statusline/main/statusline.jq' -OutFile $TargetJq
+    Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/etpala/claude-code-statusline/main/statusline.jq' -OutFile $TargetJq
 }
 Write-Output "✓ Installed jq filter to $TargetJq"
 

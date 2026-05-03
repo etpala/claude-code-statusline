@@ -12,16 +12,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kcchien/claude-code-statusline.git"
+    "url": "git+https://github.com/etpala/claude-code-statusline.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/kcchien/claude-code-statusline/issues"
+    "url": "https://github.com/etpala/claude-code-statusline/issues"
   },
-  "homepage": "https://github.com/kcchien/claude-code-statusline#readme",
+  "homepage": "https://github.com/etpala/claude-code-statusline#readme",
   "dependencies": {
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.4",

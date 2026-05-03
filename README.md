@@ -9,6 +9,7 @@
 A beautiful, information-dense status line for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — the CLI tool by Anthropic.
 
 Turn the blank status bar into a real-time dashboard: model, context usage with gradient progress bar, cost, duration, git branch, rate limits, and more.
+This project is a fork from [https://github.com/kcchien/claude-code-statusline](https://github.com/kcchien/claude-code-statusline)
 
 ## Preview
 
@@ -58,7 +59,7 @@ Turn the blank status bar into a real-time dashboard: model, context usage with 
 ### Quick install
 
 ```bash
-git clone https://github.com/kcchien/claude-code-statusline.git
+git clone https://github.com/etpala/claude-code-statusline.git
 cd claude-code-statusline
 ./install.sh
 ```
