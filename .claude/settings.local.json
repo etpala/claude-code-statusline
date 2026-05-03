@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x examples/test-mock.sh statusline.sh)",
+      "Bash(./examples/test-mock.sh nerdfont *)",
+      "Bash(CLAUDE_STATUSLINE_NERDFONT=1 bash statusline.sh)"
+    ]
+  }
+}

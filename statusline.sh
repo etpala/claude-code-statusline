@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # ~/.claude/statusline.sh — Claude Code session status line (aesthetic edition)
 #
-# 三行輸出：
-#   第一行：◆ 模型 │ 漸層進度條 百分比 │ 費用 │ 時間 │ 速率限制
-#   第二行：⎇分支* │ +增/-減 │ 目錄
-#   第三行：❯ 提示符（顏色跟上下文用量連動）
+# 兩行輸出：
+#   第一行：◆ 模型 [Pro|Max] │ 漸層進度條 百分比 │ 費用 │ 時間 │ 速率限制（可含重置時間）
+#   第二行：Cache／In·Out │ 倉庫(分支)* │ +增/-減 │ 目錄 │ git worktree │ Agent
 #
 # 環境變數：
 #   CLAUDE_STATUSLINE_ASCII=1     退回純 ASCII
@@ -94,28 +93,42 @@ fallback_prompt() {
 command -v jq &>/dev/null || fallback_prompt "─ │ jq not found"
 
 # ═══════════════════════════════════════════════════════════════
+# 百分比著色（與 statusline-command 一致）
+# ═══════════════════════════════════════════════════════════════
+
+# 高占比 = 警告（上下文、速率上限）
+color_pct() {
+  local n="${1%.*}"
+  n=${n:-0}
+  if (( n >= 76 )); then printf '%b%s%%%b' "$RED" "$n" "$RST"
+  elif (( n >= 51 )); then printf '%b%s%%%b' "$YELLOW" "$n" "$RST"
+  else printf '%b%s%%%b' "$GREEN" "$n" "$RST"
+  fi
+}
+
+# 高占比 = 好（快取命中率）
+color_pct_inv() {
+  local n="${1%.*}"
+  n=${n:-0}
+  if (( n >= 71 )); then printf '%b%s%%%b' "$GREEN" "$n" "$RST"
+  elif (( n >= 41 )); then printf '%b%s%%%b' "$YELLOW" "$n" "$RST"
+  else printf '%b%s%%%b' "$RED" "$n" "$RST"
+  fi
+}
+
+# ═══════════════════════════════════════════════════════════════
 # 讀取 JSON（單次 jq）
 # ═══════════════════════════════════════════════════════════════
 
 input=$(cat)
 
-parsed=$(echo "$input" | jq -r '
-  (.model.display_name // ""),
-  (.context_window.used_percentage // 0 | tostring),
-  (.cost.total_cost_usd // 0 | tostring),
-  (.workspace.current_dir // "." | split("/") | last),
-  (.worktree.branch // ""),
-  (.rate_limits.five_hour.used_percentage // -1 | tostring),
-  (.rate_limits.seven_day.used_percentage // -1 | tostring),
-  (.agent.name // ""),
-  (.workspace.current_dir // "."),
-  (.cost.total_lines_added // 0 | tostring),
-  (.cost.total_lines_removed // 0 | tostring),
-  (.cost.total_duration_ms // 0 | tostring),
-  (.context_window.context_window_size // 0 | tostring),
-  (.worktree.name // ""),
-  "END"
-' 2>/dev/null) || fallback_prompt "─ │ parse error"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JQ_FILE="${SCRIPT_DIR}/statusline.jq"
+if [[ ! -f "$JQ_FILE" ]]; then
+  fallback_prompt "─ │ statusline.jq missing next to statusline.sh"
+fi
+
+parsed=$(echo "$input" | jq -r -f "$JQ_FILE" 2>/dev/null) || fallback_prompt "─ │ parse error"
 
 {
   IFS= read -r model_name
@@ -132,14 +145,28 @@ parsed=$(echo "$input" | jq -r '
   IFS= read -r duration_ms
   IFS= read -r ctx_size
   IFS= read -r wt_name
+  IFS= read -r model_id
+  IFS= read -r total_in
+  IFS= read -r total_out
+  IFS= read -r cache_read
+  IFS= read -r cur_input
+  IFS= read -r rate5h_reset
+  IFS= read -r rate7d_reset
+  IFS= read -r git_worktree_json
   IFS= read -r _sentinel
 } <<< "$parsed"
 
 # ═══════════════════════════════════════════════════════════════
-# 模型
+# 模型與 Plan（與 statusline-command 一致）
 # ═══════════════════════════════════════════════════════════════
 
 model="${model_name:-─}"
+
+plan="Pro"
+case "${model_id:-}" in
+  *claude-opus*|*claude-3-opus*) plan="Max" ;;
+esac
+plan_section=" ${GRAY}[${plan}]${RST}"
 
 # ═══════════════════════════════════════════════════════════════
 # 上下文進度條
@@ -235,24 +262,69 @@ if (( dur_ms > 0 )); then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# Git 分支與髒標記（帶快取）
+# 快取命中率與會話 Token（與 statusline-command 一致）
 # ═══════════════════════════════════════════════════════════════
 
-GIT_CACHE="/tmp/claude-statusline-git-cache"
+cache_read=${cache_read:-0}
+cur_input=${cur_input:-0}
+cache_pct=0
+if (( cache_read > 0 || cur_input > 0 )); then
+  total_cu=$((cache_read + cur_input))
+  if (( total_cu > 0 )); then
+    cache_pct=$((cache_read * 100 / total_cu))
+  fi
+fi
+
+cache_section=""
+if (( cache_read > 0 || cur_input > 0 )); then
+  cache_section="${GRAY}Cache:${RST} $(color_pct_inv "$cache_pct")"
+fi
+
+token_section=""
+if [[ -n "${total_in}" && -n "${total_out}" ]]; then
+  in_k=$(echo "$total_in" | awk '{printf "%.0fk", $1/1000}')
+  out_k=$(echo "$total_out" | awk '{printf "%.0fk", $1/1000}')
+  token_section="${CYAN}In:${RST} ${in_k}  ${CYAN}Out:${RST} ${out_k}"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# Git 分支與髒標記（帶快取，含倉庫名）
+# ═══════════════════════════════════════════════════════════════
+
+SL_TMP="${TMPDIR:-/tmp}"
+if [[ -n "${TEMP:-}" ]]; then
+  SL_TMP="$TEMP"
+fi
+GIT_CACHE="${SL_TMP}/claude-statusline-git-cache"
 GIT_CACHE_MAX_AGE=5
+
+git_cache_mtime() {
+  if stat -f %m "$1" &>/dev/null; then
+    stat -f %m "$1"
+  elif stat -c %Y "$1" &>/dev/null; then
+    stat -c %Y "$1"
+  else
+    echo 0
+  fi
+}
 
 git_branch="${branch:-}"
 dirty=""
+git_repo=""
 
 git_cache_is_stale() {
   [[ ! -f "$GIT_CACHE" ]] && return 0
-  local cache_age=$(( $(date +%s) - $(stat -f %m "$GIT_CACHE" 2>/dev/null || echo 0) ))
+  local now mt
+  now=$(date +%s)
+  mt=$(git_cache_mtime "$GIT_CACHE")
+  local cache_age=$((now - mt))
   (( cache_age > GIT_CACHE_MAX_AGE ))
 }
 
 if [[ -n "${cwd_full:-}" && -d "${cwd_full:-}" ]]; then
   if git_cache_is_stale; then
     if git -C "$cwd_full" rev-parse --git-dir &>/dev/null; then
+      cached_repo="$(basename "$(git -C "$cwd_full" rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || true)"
       cached_branch="${git_branch}"
       if [[ -z "$cached_branch" ]]; then
         cached_branch=$(git -C "$cwd_full" -c core.useBuiltinFSMonitor=false branch --show-current 2>/dev/null) || true
@@ -265,14 +337,15 @@ if [[ -n "${cwd_full:-}" && -d "${cwd_full:-}" ]]; then
          ! git -C "$cwd_full" -c core.useBuiltinFSMonitor=false diff --cached --quiet 2>/dev/null; then
         cached_dirty="*"
       fi
-      echo "${cached_branch}|${cached_dirty}" > "$GIT_CACHE"
+      echo "${cached_repo}|${cached_branch}|${cached_dirty}" > "$GIT_CACHE"
     else
-      echo "|" > "$GIT_CACHE"
+      echo "||" > "$GIT_CACHE"
     fi
   fi
 
   if [[ -f "$GIT_CACHE" ]]; then
-    IFS='|' read -r cached_br cached_dt < "$GIT_CACHE"
+    IFS='|' read -r cached_repo cached_br cached_dt < "$GIT_CACHE"
+    git_repo="${cached_repo}"
     if [[ -z "$git_branch" ]]; then git_branch="${cached_br}"; fi
     dirty="${cached_dt}"
   fi
@@ -290,7 +363,7 @@ if (( lines_add > 0 || lines_rm > 0 )); then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# 速率限制（條件顯示）
+# 速率限制（條件顯示，可含重置時間）
 # ═══════════════════════════════════════════════════════════════
 
 rate_section=""
@@ -299,31 +372,33 @@ rate7d_int=${rate7d%.*}; rate7d_int=${rate7d_int:-0}
 
 rate_parts=""
 if (( rate5h_int >= 0 )); then
-  if (( rate5h_int >= 80 )); then rate_parts+="${RED}5h:${rate5h_int}%${RST}"
-  else rate_parts+="${GRAY}5h:${rate5h_int}%${RST}"; fi
+  reset5=""
+  if [[ -n "${rate5h_reset}" ]]; then
+    reset5=$(date -r "${rate5h_reset}" "+%H:%M" 2>/dev/null || date -d "@${rate5h_reset}" "+%H:%M" 2>/dev/null || true)
+  fi
+  seg="5h: $(color_pct "${rate5h}")"
+  [[ -n "$reset5" ]] && seg+=" → ${GRAY}${reset5}${RST}"
+  rate_parts+="${seg}"
 fi
 if (( rate7d_int >= 0 )); then
-  if [[ -n "$rate_parts" ]]; then rate_parts+=" "; fi
-  if (( rate7d_int >= 80 )); then rate_parts+="${RED}7d:${rate7d_int}%${RST}"
-  else rate_parts+="${GRAY}7d:${rate7d_int}%${RST}"; fi
+  [[ -n "$rate_parts" ]] && rate_parts+="  "
+  reset7=""
+  if [[ -n "${rate7d_reset}" ]]; then
+    reset7=$(date -r "${rate7d_reset}" "+%a %H:%M" 2>/dev/null || date -d "@${rate7d_reset}" "+%a %H:%M" 2>/dev/null || true)
+  fi
+  seg="7d: $(color_pct "${rate7d}")"
+  [[ -n "$reset7" ]] && seg+=" → ${GRAY}${reset7}${RST}"
+  rate_parts+="${seg}"
 fi
 if [[ -n "$rate_parts" ]]; then
   rate_section="${SEP}${rate_parts}"
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# 動態提示符（顏色跟上下文用量連動）
-# ═══════════════════════════════════════════════════════════════
-
-if (( pct_int >= 90 )); then prompt_color="$RED"
-elif (( pct_int >= 70 )); then prompt_color="$YELLOW"
-else prompt_color="$GREEN"; fi
-
-# ═══════════════════════════════════════════════════════════════
 # 組裝第一行
 # ═══════════════════════════════════════════════════════════════
 
-line1="${PURPLE}${S_BRAND}${RST} ${CYAN}${model}${RST}"
+line1="${PURPLE}${S_BRAND}${RST} ${CYAN}${model}${RST}${plan_section}"
 line1+="${SEP}${bar} ${pct_color}${pct_int}%${RST}${ctx_warn}${ctx_label}"
 line1+="${SEP}${cost_color}${S_COST}\$${cost_fmt}${RST}"
 line1+="${dur_section}"
@@ -334,9 +409,31 @@ line1+="${rate_section}"
 # ═══════════════════════════════════════════════════════════════
 
 parts=()
-if [[ -n "$git_branch" ]]; then
-  parts+=("${GRAY}${S_BRANCH}${git_branch}${dirty}${RST}")
+
+if [[ -n "$cache_section" ]]; then
+  parts+=("${cache_section}")
 fi
+if [[ -n "$token_section" ]]; then
+  parts+=("${token_section}")
+fi
+
+git_line=""
+if [[ -n "$git_repo" && -n "$git_branch" ]]; then
+  git_line="${GRAY}${git_repo} (${git_branch})${dirty}${RST}"
+elif [[ -n "$git_branch" ]]; then
+  git_line="${GRAY}${S_BRANCH}${git_branch}${dirty}${RST}"
+fi
+if [[ -n "${git_worktree_json}" ]]; then
+  if [[ -n "$git_line" ]]; then
+    git_line+=" ${GRAY}[${git_worktree_json}]${RST}"
+  else
+    git_line="${GRAY}[${git_worktree_json}]${RST}"
+  fi
+fi
+if [[ -n "$git_line" ]]; then
+  parts+=("${git_line}")
+fi
+
 if [[ -n "$lines_section" ]]; then
   parts+=("${lines_section}")
 fi

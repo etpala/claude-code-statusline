@@ -4,7 +4,7 @@
 
 # ◆ claude-code-statusline
 
-[English](README.md) | **繁體中文**
+[English](README.md) | **繁體中文** | [简体中文](README.zh-CN.md)
 
 為 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（Anthropic 的 CLI 工具）打造的即時狀態列——把空白的底部變成一目了然的 session 儀表板。
 
@@ -63,8 +63,9 @@ cd claude-code-statusline
 ### 手動安裝
 
 ```bash
-# 1. 複製腳本
+# 1. 複製腳本與 jq 篩選（須與 statusline.sh 同目錄）
 cp statusline.sh ~/.claude/statusline.sh
+cp statusline.jq ~/.claude/statusline.jq
 chmod +x ~/.claude/statusline.sh
 
 # 2. 編輯 ~/.claude/settings.json，加入：

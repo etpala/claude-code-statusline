@@ -4,7 +4,7 @@
 
 # ◆ claude-code-statusline
 
-**English** | [繁體中文](README.zh-TW.md)
+**English** | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
 
 A beautiful, information-dense status line for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — the CLI tool by Anthropic.
 
@@ -36,7 +36,10 @@ Turn the blank status bar into a real-time dashboard: model, context usage with 
 | **Smart hiding** | Zero values (`+0/-0`, `0m0s`, rate limits) are hidden. `$0.00` stays but dims. |
 | **Dynamic cost coloring** | Yellow by default, red when > $10. |
 | **Git branch + dirty** | Shows branch name with `*` for uncommitted changes. Cached for 5 seconds to stay fast. |
-| **Rate limits** | 5-hour and 7-day usage (Claude Pro/Max only). Red when > 80%. |
+| **Rate limits** | 5-hour and 7-day usage (Claude Pro/Max). Includes `resets_at` local time when present. |
+| **Plan** | `[Pro]` / `[Max]` heuristic from `model.id` (Opus → Max). |
+| **Prompt cache** | `current_usage` cache hit % (higher is better). |
+| **Session tokens** | Cumulative `total_input_tokens` / `total_output_tokens` (k). |
 | **Agent / Worktree indicator** | `⚙ code-reviewer` or `⚙ worktree:my-feature` — only when active. |
 | **Context window size** | Shows `1M` or `200k` only when not already in the model name. |
 | **Brand identity** | `◆` diamond in Anthropic purple (#7266EA). |
@@ -63,12 +66,15 @@ cd claude-code-statusline
 ### Manual install
 
 ```bash
-# 1. Copy the script
+# 1. Copy the script and jq filter (must stay beside statusline.sh)
 cp statusline.sh ~/.claude/statusline.sh
+cp statusline.jq ~/.claude/statusline.jq
 chmod +x ~/.claude/statusline.sh
 
 # 2. Add to ~/.claude/settings.json
 ```
+
+On **Windows**, use [statusline.ps1](statusline.ps1) and the same `statusline.jq` next to it — see [简体中文说明](README.zh-CN.md).
 
 Add this to your `settings.json`:
 

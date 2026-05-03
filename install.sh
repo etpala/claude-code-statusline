@@ -10,6 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="$HOME/.claude/statusline.sh"
+JQ_TARGET="$HOME/.claude/statusline.jq"
 SETTINGS="$HOME/.claude/settings.json"
 
 echo "◆ claude-code-statusline installer"
@@ -22,7 +23,7 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
-# Copy script
+# Copy script + jq filter (must live beside statusline.sh)
 if [[ -f "$SCRIPT_DIR/statusline.sh" ]]; then
   cp "$SCRIPT_DIR/statusline.sh" "$TARGET"
 else
@@ -31,6 +32,14 @@ else
 fi
 chmod +x "$TARGET"
 echo "✓ Installed to $TARGET"
+
+if [[ -f "$SCRIPT_DIR/statusline.jq" ]]; then
+  cp "$SCRIPT_DIR/statusline.jq" "$JQ_TARGET"
+else
+  echo "Downloading statusline.jq..."
+  curl -fsSL "https://raw.githubusercontent.com/kcchien/claude-code-statusline/main/statusline.jq" -o "$JQ_TARGET"
+fi
+echo "✓ Installed jq filter to $JQ_TARGET"
 
 # Update settings.json
 if [[ -f "$SETTINGS" ]]; then
